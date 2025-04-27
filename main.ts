@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std/http/server.ts";
 import { join } from "https://deno.land/std/path/mod.ts";
 
@@ -25,32 +24,31 @@ const handler = async (req: Request) => {
   if (req.method === "POST") {
     try {
       const body = await req.json();
-      const prompt = body?.prompt || "Write a function to reverse a string in JavaScript.";
+      const prompt = body?.prompt || "Explain how AI works";  // Default prompt
 
-      // Call to the Gemini API (replace with actual API URL)
-      
-const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    contents: [{
-      parts: [{ text: prompt }] // Here `prompt` is the input text from the user
-    }]
-  }),
-});
+      // Call to the Gemini API to generate content (code)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }],
+          }],
+        }),
+      });
 
-const data = await response.json(); // Parse the JSON response
+      const data = await response.json();  // Parse the JSON response
 
-// Check if there was an issue with the response
-if (!response.ok) {
-  console.error("Error calling Gemini API:", data);
-  return new Response("Error generating code: " + data.error.message, { status: 500 });
-}
+      // Check if there was an issue with the response
+      if (!response.ok) {
+        console.error("Error calling Gemini API:", data);
+        return new Response("Error generating code: " + data.error.message, { status: 500 });
+      }
 
-const generatedCode = data.choices[0]?.text.trim() || "No code generated.";
-      
+      const generatedCode = data.choices[0]?.text.trim() || "No code generated.";
+
       const gitHubResponse = await pushToGitHub(generatedCode, prompt);
 
       return new Response(
