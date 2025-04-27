@@ -39,12 +39,23 @@ const handler = async (req: Request) => {
         }),
       });
 
-      const data = await response.json();  // Parse the JSON response
+      const responseText = await response.text(); // Get the raw response as text
 
-      // Check if there was an issue with the response
+      console.log("Raw Gemini API Response: ", responseText); // Log the raw response to see what is returned
+
       if (!response.ok) {
-        console.error("Error calling Gemini API:", data);
-        return new Response("Error generating code: " + data.error.message, { status: 500 });
+        // If the response is not successful, return the raw error text
+        console.error("Error from Gemini API:", responseText);
+        return new Response("Error generating code: " + responseText, { status: response.status });
+      }
+
+      // Try to parse the response text as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);  // Attempt to parse the response as JSON
+      } catch (error) {
+        console.error("Error parsing JSON response:", error);
+        return new Response("Error parsing response: " + responseText, { status: 500 });
       }
 
       const generatedCode = data.choices[0]?.text.trim() || "No code generated.";
@@ -171,12 +182,19 @@ async function pushToGitHub(generatedCode: string, prompt: string) {
     body: JSON.stringify({
       message: `Add generated code for prompt: ${prompt}`,
       content: fileContent,
-      branch: "main", // or specify your desired branch
+      branch: "main",
     }),
   });
 
-  const data = await response.json();
-  return data;
+  const gitHubResponseText = await response.text(); // Get the raw response from GitHub as text
+
+  if (!response.ok) {
+    console.error("Error from GitHub API:", gitHubResponseText);
+    return new Response("Error pushing to GitHub: " + gitHubResponseText, { status: response.status });
+  }
+
+  const gitHubData = JSON.parse(gitHubResponseText);
+  return gitHubData;
 }
 
 // Start the server
