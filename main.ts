@@ -28,7 +28,7 @@ const handler = async (req: Request) => {
       const prompt = body?.prompt || "Write a function to reverse a string in JavaScript.";
 
       // Call to the Gemini API (replace with actual API URL)
-      const response = await fetch("https://gemini-api.example.com/v1/code-gen", {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=GEMINI_API_KEY", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
