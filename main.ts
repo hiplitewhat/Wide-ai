@@ -1,20 +1,26 @@
+
 import { serve } from "https://deno.land/std/http/server.ts";
-import { config } from "https://deno.land/x/dotenv/mod.ts";
 import { join } from "https://deno.land/std/path/mod.ts";
 
 // Load environment variables (API keys, GitHub token, repo info)
-const { GEMINI_API_KEY, GITHUB_TOKEN, GITHUB_USER, GITHUB_REPO } = config();
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
+const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN")!;
+const GITHUB_USER = Deno.env.get("GITHUB_USER")!;
+const GITHUB_REPO = Deno.env.get("GITHUB_REPO")!;
 
 // Serve HTML page and handle POST requests
 const handler = async (req: Request) => {
   const url = new URL(req.url);
-  
+
   // Serve HTML when accessing the root ("/")
   if (url.pathname === "/") {
     const htmlContent = await getHtmlPage();
-    return new Response(htmlContent, { status: 200, headers: { "Content-Type": "text/html" } });
+    return new Response(htmlContent, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
   }
-  
+
   // Handle POST request to generate code and save to GitHub
   if (req.method === "POST") {
     try {
@@ -107,7 +113,8 @@ async function getHtmlPage() {
                 margin-top: 20px;
                 padding: 10px;
                 background-color: #e9ffe9;
-                border: 1px solid #4CAF50;
+                border: 1px solid #c0f0c0;
+                border-radius: 4px;
             }
         </style>
     </head>
@@ -115,88 +122,57 @@ async function getHtmlPage() {
         <header>
             <h1>AI Code Generator</h1>
         </header>
-
         <div class="container">
-            <h2>Enter a Code Prompt</h2>
-            <form id="code-form">
-                <label for="prompt">Prompt:</label>
-                <input type="text" id="prompt" name="prompt" placeholder="e.g., Write a Python function to check if a number is prime" required>
-                <button type="submit">Generate Code</button>
-            </form>
-
-            <div id="result" class="result" style="display: none;">
-                <h3>Generated Code:</h3>
-                <pre id="generated-code"></pre>
-                <h3>GitHub Link:</h3>
-                <p id="github-link"></p>
-            </div>
+            <h2>Enter Prompt</h2>
+            <input type="text" id="prompt" placeholder="Enter prompt...">
+            <button onclick="generateCode()">Generate Code</button>
+            <div class="result" id="result"></div>
         </div>
-
         <script>
-            document.getElementById('code-form').addEventListener('submit', async (event) => {
-                event.preventDefault();
-                const prompt = document.getElementById('prompt').value;
-
-                // Send the prompt to the Deno server
-                const response = await fetch('/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ prompt: prompt }),
-                });
-
-                const data = await response.json();
-
-                // Show the generated code and GitHub link
-                if (response.ok) {
-                    document.getElementById('generated-code').textContent = data.generated_code;
-                    document.getElementById('github-link').textContent = data.github_response;
-                    document.getElementById('result').style.display = 'block';
-                } else {
-                    document.getElementById('generated-code').textContent = 'Error generating code: ' + data.error;
-                    document.getElementById('github-link').textContent = '';
-                    document.getElementById('result').style.display = 'block';
+            async function generateCode() {
+                const prompt = document.getElementById("prompt").value;
+                const resultDiv = document.getElementById("result");
+                try {
+                    const response = await fetch("/", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ prompt: prompt }),
+                    });
+                    const data = await response.json();
+                    resultDiv.innerHTML = '<pre>' + data.generated_code + '</pre>';
+                } catch (error) {
+                    resultDiv.innerHTML = 'Error generating code: ' + error.message;
                 }
-            });
+            }
         </script>
     </body>
     </html>
   `;
 }
 
-// Function to save the generated code to GitHub
-async function pushToGitHub(code: string, prompt: string) {
-  try {
-    const githubApiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/generated_code/${prompt.replace(/\s+/g, '_')}.js`;
+// Function to push generated code to GitHub
+async function pushToGitHub(generatedCode: string, prompt: string) {
+  const githubApiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/code-gen-result.js`;
+  const fileContent = btoa(generatedCode); // Base64 encode the content
 
-    const content = btoa(code); // Base64 encode the code
-    const message = `Add generated code for prompt: ${prompt}`;
+  const response = await fetch(githubApiUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GITHUB_TOKEN}`,
+    },
+    body: JSON.stringify({
+      message: `Add generated code for prompt: ${prompt}`,
+      content: fileContent,
+      branch: "main", // or specify your desired branch
+    }),
+  });
 
-    const response = await fetch(githubApiUrl, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${GITHUB_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: message,
-        content: content, // The base64-encoded code
-        branch: "main",    // Specify the branch to commit to
-      }),
-    });
-
-    const data = await response.json();
-    if (response.ok) {
-      return `Successfully pushed code to GitHub: ${data.content?.html_url}`;
-    } else {
-      return `Error pushing to GitHub: ${data.message}`;
-    }
-  } catch (error) {
-    return `Error pushing to GitHub: ${error.message}`;
-  }
+  const data = await response.json();
+  return data;
 }
 
-// Start the HTTP server
-console.log("Server running on http://localhost:8000");
-serve(handler);
+// Start the server
+serve(handler, { port: 8000 });
