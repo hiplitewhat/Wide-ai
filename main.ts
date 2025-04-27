@@ -39,34 +39,29 @@ const handler = async (req: Request) => {
       });
 
       const responseText = await response.text(); // Get the raw response as text
-
-      // Log the raw response to help debug
-      console.log("Raw Gemini API Response: ", responseText); // Log the raw response
+      console.log("Raw Gemini API Response: ", responseText); // Log raw response for debugging
 
       if (!response.ok) {
-        // If the response is not successful, log and return the error
+        // Log error and return the error response
         console.error("Error from Gemini API:", responseText);
         return new Response("Error generating code: " + responseText, { status: response.status });
       }
 
-      // Try to parse the response text as JSON
       let data;
       try {
         data = JSON.parse(responseText);  // Attempt to parse the response as JSON
       } catch (error) {
         // Log error if JSON parsing fails
-        console.error("Error parsing JSON response:", error);
-        return new Response("Error parsing response: " + responseText, { status: 500 });
+        console.error("Error parsing Gemini API response:", error); // Log parsing error
+        return new Response("Error parsing Gemini response: " + responseText, { status: 500 });
       }
 
       const generatedCode = data.choices[0]?.text.trim() || "No code generated.";
+      console.log("Generated Code: ", generatedCode); // Log the generated code
 
-      // Log the generated code for debugging purposes
-      console.log("Generated Code: ", generatedCode);
-
+      // Push the code to GitHub
       const gitHubResponse = await pushToGitHub(generatedCode, prompt);
 
-      // Return the generated code and GitHub response
       return new Response(
         JSON.stringify({
           generated_code: generatedCode,
@@ -75,9 +70,8 @@ const handler = async (req: Request) => {
         { status: 200 },
       );
     } catch (error) {
-      // Log unexpected errors
-      console.error("Unexpected Error: ", error);
-      return new Response(`Error: ${error.message}`, { status: 500 });
+      console.error("Unexpected Error: ", error);  // Log unexpected errors
+      return new Response(`Error: ${error.message || error}`, { status: 500 });
     }
   }
 
@@ -194,9 +188,7 @@ async function pushToGitHub(generatedCode: string, prompt: string) {
   });
 
   const gitHubResponseText = await response.text(); // Get the raw response from GitHub as text
-
-  // Log the raw response from GitHub
-  console.log("GitHub API Response: ", gitHubResponseText);
+  console.log("GitHub API Response: ", gitHubResponseText); // Log the raw response from GitHub
 
   if (!response.ok) {
     console.error("Error from GitHub API:", gitHubResponseText);
