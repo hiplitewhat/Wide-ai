@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std/http/server.ts";
-import { join } from "https://deno.land/std/path/mod.ts";
 
 // Load environment variables (API keys, GitHub token, repo info)
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
@@ -41,10 +40,11 @@ const handler = async (req: Request) => {
 
       const responseText = await response.text(); // Get the raw response as text
 
-      console.log("Raw Gemini API Response: ", responseText); // Log the raw response to see what is returned
+      // Log the raw response to help debug
+      console.log("Raw Gemini API Response: ", responseText); // Log the raw response
 
       if (!response.ok) {
-        // If the response is not successful, return the raw error text
+        // If the response is not successful, log and return the error
         console.error("Error from Gemini API:", responseText);
         return new Response("Error generating code: " + responseText, { status: response.status });
       }
@@ -54,14 +54,19 @@ const handler = async (req: Request) => {
       try {
         data = JSON.parse(responseText);  // Attempt to parse the response as JSON
       } catch (error) {
+        // Log error if JSON parsing fails
         console.error("Error parsing JSON response:", error);
         return new Response("Error parsing response: " + responseText, { status: 500 });
       }
 
       const generatedCode = data.choices[0]?.text.trim() || "No code generated.";
 
+      // Log the generated code for debugging purposes
+      console.log("Generated Code: ", generatedCode);
+
       const gitHubResponse = await pushToGitHub(generatedCode, prompt);
 
+      // Return the generated code and GitHub response
       return new Response(
         JSON.stringify({
           generated_code: generatedCode,
@@ -70,6 +75,8 @@ const handler = async (req: Request) => {
         { status: 200 },
       );
     } catch (error) {
+      // Log unexpected errors
+      console.error("Unexpected Error: ", error);
       return new Response(`Error: ${error.message}`, { status: 500 });
     }
   }
@@ -187,6 +194,9 @@ async function pushToGitHub(generatedCode: string, prompt: string) {
   });
 
   const gitHubResponseText = await response.text(); // Get the raw response from GitHub as text
+
+  // Log the raw response from GitHub
+  console.log("GitHub API Response: ", gitHubResponseText);
 
   if (!response.ok) {
     console.error("Error from GitHub API:", gitHubResponseText);
